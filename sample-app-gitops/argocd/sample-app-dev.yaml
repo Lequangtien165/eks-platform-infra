@@ -6,9 +6,9 @@ metadata:
 spec:
   project: sample-app
   source:
-    repoURL: <git-repo-url-cua-ban>
-    targetRevision: HEAD
-    path: helm/sample-app
+    repoURL: https://github.com/<GITHUB_OWNER>/eks-platform-infra.git
+    targetRevision: main
+    path: sample-app-gitops/helm/sample-app
     helm:
       valueFiles:
         - ../../envs/dev/values.yaml

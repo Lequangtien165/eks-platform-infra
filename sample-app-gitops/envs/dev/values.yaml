@@ -13,3 +13,14 @@ env:
 service:
   port: 80
   targetPort: 8000
+
+ingress:
+  enabled: true
+  className: nginx
+  annotations: {}
+  hosts:
+    - host: sample-app-dev.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
