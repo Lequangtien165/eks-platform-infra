@@ -2,7 +2,9 @@
 *.tfstate
 *.tfstate.*
 .terraform.lock.hcl
-
+__pycache__/
+*.pyc
+.venv/
 crash.log
 *.tfvars
 *.tfvars.json
