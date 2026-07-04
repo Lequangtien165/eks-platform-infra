@@ -37,3 +37,13 @@ probes:
     initialDelaySeconds: 5
     periodSeconds: 10
 
+ingress:
+  enabled: false
+  className: nginx
+  annotations: {}
+  hosts:
+    - host: sample-app.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
