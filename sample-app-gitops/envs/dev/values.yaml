@@ -1,0 +1,15 @@
+replicaCount: 2
+
+image:
+  repository: <AWS_ACCOUNT_ID>.dkr.ecr.ap-southeast-1.amazonaws.com/sample-app
+  tag: "0.1.0"
+  pullPolicy: IfNotPresent
+
+env:
+  appName: sample-app
+  appEnv: dev
+  appVersion: "0.1.0"
+
+service:
+  port: 80
+  targetPort: 8000
