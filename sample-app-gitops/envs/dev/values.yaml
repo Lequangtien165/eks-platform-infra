@@ -8,7 +8,7 @@ image:
 env:
   appName: sample-app
   appEnv: dev
-  appVersion: "0.1.0"
+  appVersion: "0.1.1"
 
 service:
   port: 80
