@@ -22,16 +22,16 @@ module "vpc" {
 
 # Thêm module EKS
 module "eks" {
-    source = "../../modules/eks"
+  source = "../../modules/eks"
 
-    cluster_name = var.cluster_name
-    cluster_version = var.cluster_version
-    subnet_ids = module.vpc.private_subnet_ids
+  cluster_name    = var.cluster_name
+  cluster_version = var.cluster_version
+  subnet_ids      = module.vpc.private_subnet_ids
 
-    node_group_name = var.node_group_name
-    desired_size = var.desired_size
-    min_size = var.min_size
-    max_size = var.max_size
-    instance_types = var.instance_types
+  node_group_name = var.node_group_name
+  desired_size    = var.desired_size
+  min_size        = var.min_size
+  max_size        = var.max_size
+  instance_types  = var.instance_types
 }
 

@@ -1,0 +1,273 @@
+---
+- name: Bootstrap EKS platform components
+  hosts: local
+  gather_facts: false
+
+  tasks:
+    - name: Verify required CLIs are available
+      ansible.builtin.command: "{{ item }} --version"
+      changed_when: false
+      loop:
+        - aws
+        - kubectl
+        - helm
+        - terraform
+
+    - name: Verify eksctl is available when IRSA bootstrap is enabled
+      ansible.builtin.command: eksctl version
+      changed_when: false
+      when: manage_aws_lbc_irsa_with_eksctl | bool
+
+    - name: Update kubeconfig for EKS cluster
+      ansible.builtin.command:
+        argv:
+          - aws
+          - eks
+          - update-kubeconfig
+          - --region
+          - "{{ aws_region }}"
+          - --name
+          - "{{ cluster_name }}"
+          - --profile
+          - "{{ aws_profile }}"
+      changed_when: "'Updated context' in kubeconfig_update.stdout or 'Added new context' in kubeconfig_update.stdout"
+      register: kubeconfig_update
+
+    - name: Read VPC ID from Terraform output
+      ansible.builtin.command:
+        argv:
+          - terraform
+          - output
+          - -raw
+          - vpc_id
+      args:
+        chdir: "{{ terraform_env_dir }}"
+      changed_when: false
+      register: terraform_vpc_id
+
+    - name: Set platform facts
+      ansible.builtin.set_fact:
+        vpc_id: "{{ terraform_vpc_id.stdout | trim }}"
+
+    - name: Wait for EKS nodes to be Ready
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - wait
+          - --for=condition=Ready
+          - nodes
+          - --all
+          - --timeout=300s
+      changed_when: false
+
+    - name: Create Argo CD namespace
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - create
+          - namespace
+          - "{{ argocd_namespace }}"
+      register: create_argocd_namespace
+      changed_when: create_argocd_namespace.rc == 0
+      failed_when:
+        - create_argocd_namespace.rc != 0
+        - "'AlreadyExists' not in create_argocd_namespace.stderr"
+
+    - name: Install or upgrade Argo CD
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - apply
+          - -n
+          - "{{ argocd_namespace }}"
+          - -f
+          - "{{ argocd_install_url }}"
+      changed_when: true
+
+    - name: Wait for Argo CD deployments
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - rollout
+          - status
+          - deployment/{{ item }}
+          - -n
+          - "{{ argocd_namespace }}"
+          - --timeout=300s
+      changed_when: false
+      loop:
+        - argocd-server
+        - argocd-repo-server
+        - argocd-applicationset-controller
+
+    - name: Add ingress-nginx Helm repo
+      ansible.builtin.command:
+        argv:
+          - helm
+          - repo
+          - add
+          - "{{ ingress_nginx_repo_name }}"
+          - "{{ ingress_nginx_repo_url }}"
+      register: add_ingress_repo
+      changed_when: add_ingress_repo.rc == 0
+      failed_when:
+        - add_ingress_repo.rc != 0
+        - "'already exists' not in add_ingress_repo.stderr"
+
+    - name: Add AWS EKS Helm repo
+      ansible.builtin.command:
+        argv:
+          - helm
+          - repo
+          - add
+          - "{{ aws_lbc_repo_name }}"
+          - "{{ aws_lbc_repo_url }}"
+      register: add_eks_repo
+      changed_when: add_eks_repo.rc == 0
+      failed_when:
+        - add_eks_repo.rc != 0
+        - "'already exists' not in add_eks_repo.stderr"
+
+    - name: Update Helm repos
+      ansible.builtin.command: helm repo update
+      changed_when: true
+
+    - name: Install or upgrade ingress-nginx for dev ingress
+      ansible.builtin.command:
+        argv:
+          - helm
+          - upgrade
+          - --install
+          - "{{ ingress_nginx_release }}"
+          - "{{ ingress_nginx_chart_ref }}"
+          - --namespace
+          - "{{ ingress_nginx_namespace }}"
+          - --create-namespace
+      changed_when: true
+
+    - name: Wait for ingress-nginx controller
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - rollout
+          - status
+          - deployment/ingress-nginx-controller
+          - -n
+          - "{{ ingress_nginx_namespace }}"
+          - --timeout=300s
+      changed_when: false
+
+    - name: Associate EKS OIDC provider when requested
+      ansible.builtin.command:
+        argv:
+          - eksctl
+          - utils
+          - associate-iam-oidc-provider
+          - --region
+          - "{{ aws_region }}"
+          - --cluster
+          - "{{ cluster_name }}"
+          - --approve
+      environment:
+        AWS_PROFILE: "{{ aws_profile }}"
+      changed_when: true
+      when: manage_aws_lbc_irsa_with_eksctl | bool
+
+    - name: Create AWS Load Balancer Controller IRSA when requested
+      ansible.builtin.command:
+        argv:
+          - eksctl
+          - create
+          - iamserviceaccount
+          - --cluster
+          - "{{ cluster_name }}"
+          - --namespace
+          - "{{ aws_lbc_namespace }}"
+          - --name
+          - "{{ aws_lbc_service_account }}"
+          - --attach-policy-arn
+          - "{{ aws_lbc_policy_arn }}"
+          - --override-existing-serviceaccounts
+          - --region
+          - "{{ aws_region }}"
+          - --approve
+      environment:
+        AWS_PROFILE: "{{ aws_profile }}"
+      changed_when: true
+      when: manage_aws_lbc_irsa_with_eksctl | bool
+
+    - name: Install or upgrade AWS Load Balancer Controller for prod ALB ingress
+      ansible.builtin.command:
+        argv:
+          - helm
+          - upgrade
+          - --install
+          - "{{ aws_lbc_release }}"
+          - "{{ aws_lbc_chart_ref }}"
+          - -n
+          - "{{ aws_lbc_namespace }}"
+          - --set
+          - "clusterName={{ cluster_name }}"
+          - --set
+          - "region={{ aws_region }}"
+          - --set
+          - "vpcId={{ vpc_id }}"
+          - --set
+          - serviceAccount.create=false
+          - --set
+          - "serviceAccount.name={{ aws_lbc_service_account }}"
+      changed_when: true
+
+    - name: Wait for AWS Load Balancer Controller
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - rollout
+          - status
+          - deployment/{{ aws_lbc_release }}
+          - -n
+          - "{{ aws_lbc_namespace }}"
+          - --timeout=300s
+      changed_when: false
+
+    - name: Apply Argo CD project and applications
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - apply
+          - -f
+          - "{{ item }}"
+      changed_when: true
+      loop: "{{ argocd_app_manifests }}"
+
+    - name: Trigger hard refresh for Argo CD apps
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - annotate
+          - application
+          - "{{ item }}"
+          - -n
+          - "{{ argocd_namespace }}"
+          - argocd.argoproj.io/refresh=hard
+          - --overwrite
+      changed_when: true
+      loop:
+        - sample-app-dev
+        - sample-app-prod
+
+    - name: Show platform ingress status
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - get
+          - ingress
+          - -A
+          - -o
+          - wide
+      changed_when: false
+      register: ingress_status
+
+    - name: Print ingress status
+      ansible.builtin.debug:
+        var: ingress_status.stdout_lines

@@ -1,0 +1,32 @@
+aws_region: ap-southeast-1
+aws_profile: nhf-project
+cluster_name: nhf-eks-dev
+
+terraform_env_dir: ../../eks-platform-infra/environments/dev
+gitops_repo_root: ../../sample-app-gitops
+
+argocd_namespace: argocd
+argocd_install_url: https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+
+ingress_nginx_namespace: ingress-nginx
+ingress_nginx_release: ingress-nginx
+ingress_nginx_chart_ref: ingress-nginx/ingress-nginx
+ingress_nginx_repo_name: ingress-nginx
+ingress_nginx_repo_url: https://kubernetes.github.io/ingress-nginx
+
+aws_lbc_namespace: kube-system
+aws_lbc_release: aws-load-balancer-controller
+aws_lbc_chart_ref: eks/aws-load-balancer-controller
+aws_lbc_repo_name: eks
+aws_lbc_repo_url: https://aws.github.io/eks-charts
+aws_lbc_service_account: aws-load-balancer-controller
+
+# Keep this false when IRSA is managed by Terraform or has already been created.
+# Set true only if eksctl is installed and you want Ansible to bootstrap OIDC/IRSA.
+manage_aws_lbc_irsa_with_eksctl: false
+aws_lbc_policy_arn: arn:aws:iam::<AWS_ACCOUNT_ID>:policy/AWSLoadBalancerControllerIAMPolicy
+
+argocd_app_manifests:
+  - "{{ gitops_repo_root }}/argocd/project.yaml"
+  - "{{ gitops_repo_root }}/argocd/sample-app-dev.yaml"
+  - "{{ gitops_repo_root }}/argocd/sample-app-prod.yaml"
