@@ -49,6 +49,16 @@
       ansible.builtin.set_fact:
         vpc_id: "{{ terraform_vpc_id.stdout | trim }}"
 
+    - name: Validate private bootstrap inputs
+      ansible.builtin.assert:
+        that:
+          - git_repo_url | length > 0
+          - ecr_repository_uri | length > 0
+          - "'__' not in git_repo_url"
+          - "'__' not in ecr_repository_uri"
+          - not ecr_repository_uri.startswith('.dkr.')
+        fail_msg: "Set GIT_REPO_URL and ECR_REPOSITORY_URI, or set AWS_ACCOUNT_ID so ECR_REPOSITORY_URI can be derived."
+
     - name: Wait for EKS nodes to be Ready
       ansible.builtin.command:
         argv:
@@ -232,13 +242,31 @@
           - --timeout=300s
       changed_when: false
 
-    - name: Apply Argo CD project and applications
+    - name: Create rendered manifest directory
+      ansible.builtin.file:
+        path: "{{ rendered_manifest_dir }}"
+        state: directory
+        mode: "0700"
+
+    - name: Render Argo CD project and applications
+      ansible.builtin.copy:
+        dest: "{{ rendered_manifest_dir }}/{{ item | basename }}"
+        mode: "0600"
+        content: >-
+          {{
+            lookup('file', item)
+            | replace('__GIT_REPO_URL__', git_repo_url)
+            | replace('__ECR_REPOSITORY_URI__', ecr_repository_uri)
+          }}
+      loop: "{{ argocd_app_manifests }}"
+
+    - name: Apply rendered Argo CD project and applications
       ansible.builtin.command:
         argv:
           - kubectl
           - apply
           - -f
-          - "{{ item }}"
+          - "{{ rendered_manifest_dir }}/{{ item | basename }}"
       changed_when: true
       loop: "{{ argocd_app_manifests }}"
 

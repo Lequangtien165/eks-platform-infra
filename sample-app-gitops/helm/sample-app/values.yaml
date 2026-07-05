@@ -1,13 +1,28 @@
 replicaCount: 2
 
 image:
-  repository: <AWS_ACCOUNT_ID>.dkr.ecr.ap-southeast-1.amazonaws.com/sample-app
+  repository: __ECR_REPOSITORY_URI__
   tag: "0.1.0"
   pullPolicy: IfNotPresent
 
 serviceAccount:
   create: true
   name: ""
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 100
+  runAsGroup: 101
+  fsGroup: 101
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
 
 service:
   type: ClusterIP

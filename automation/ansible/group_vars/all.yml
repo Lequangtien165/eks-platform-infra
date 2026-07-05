@@ -1,9 +1,13 @@
 aws_region: ap-southeast-1
 aws_profile: nhf-project
+aws_account_id: "{{ lookup('env', 'AWS_ACCOUNT_ID') }}"
 cluster_name: nhf-eks-dev
 
 terraform_env_dir: ../../eks-platform-infra/environments/dev
 gitops_repo_root: ../../sample-app-gitops
+rendered_manifest_dir: .rendered
+git_repo_url: "{{ lookup('env', 'GIT_REPO_URL') }}"
+ecr_repository_uri: "{{ lookup('env', 'ECR_REPOSITORY_URI') | default(aws_account_id ~ '.dkr.ecr.' ~ aws_region ~ '.amazonaws.com/sample-app', true) }}"
 
 argocd_namespace: argocd
 argocd_install_url: https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
@@ -24,7 +28,7 @@ aws_lbc_service_account: aws-load-balancer-controller
 # Keep this false when IRSA is managed by Terraform or has already been created.
 # Set true only if eksctl is installed and you want Ansible to bootstrap OIDC/IRSA.
 manage_aws_lbc_irsa_with_eksctl: false
-aws_lbc_policy_arn: arn:aws:iam::<AWS_ACCOUNT_ID>:policy/AWSLoadBalancerControllerIAMPolicy
+aws_lbc_policy_arn: "{{ lookup('env', 'AWS_LBC_POLICY_ARN') | default('arn:aws:iam::' ~ aws_account_id ~ ':policy/AWSLoadBalancerControllerIAMPolicy', true) }}"
 
 argocd_app_manifests:
   - "{{ gitops_repo_root }}/argocd/project.yaml"

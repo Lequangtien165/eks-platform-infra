@@ -39,6 +39,8 @@ eksctl
 From this directory:
 
 ```bash
+export AWS_ACCOUNT_ID="<aws-account-id>"
+export GIT_REPO_URL="https://github.com/<owner>/<repo>.git"
 ansible-playbook bootstrap-platform.yml
 ```
 
@@ -46,8 +48,7 @@ If AWS Load Balancer Controller IRSA has not already been created by Terraform o
 
 ```bash
 ansible-playbook bootstrap-platform.yml \
-  -e manage_aws_lbc_irsa_with_eksctl=true \
-  -e aws_lbc_policy_arn=arn:aws:iam::<AWS_ACCOUNT_ID>:policy/AWSLoadBalancerControllerIAMPolicy
+  -e manage_aws_lbc_irsa_with_eksctl=true
 ```
 
 ## Access

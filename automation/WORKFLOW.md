@@ -23,10 +23,13 @@ Expected outputs:
 cd A:\NoHomelessFuture\big_big_project\sample-app-gitops
 docker build -t sample-app:0.1.0 .\app
 
-aws ecr get-login-password --region ap-southeast-1 --profile nhf-project | docker login --username AWS --password-stdin <AWS_ACCOUNT_ID>.dkr.ecr.ap-southeast-1.amazonaws.com
+$env:AWS_ACCOUNT_ID = "<aws-account-id>"
+$env:ECR_REPOSITORY_URI = "$env:AWS_ACCOUNT_ID.dkr.ecr.ap-southeast-1.amazonaws.com/sample-app"
 
-docker tag sample-app:0.1.0 <AWS_ACCOUNT_ID>.dkr.ecr.ap-southeast-1.amazonaws.com/sample-app:0.1.0
-docker push <AWS_ACCOUNT_ID>.dkr.ecr.ap-southeast-1.amazonaws.com/sample-app:0.1.0
+aws ecr get-login-password --region ap-southeast-1 --profile nhf-project | docker login --username AWS --password-stdin "$env:AWS_ACCOUNT_ID.dkr.ecr.ap-southeast-1.amazonaws.com"
+
+docker tag sample-app:0.1.0 "${env:ECR_REPOSITORY_URI}:0.1.0"
+docker push "${env:ECR_REPOSITORY_URI}:0.1.0"
 ```
 
 ## 3. Bootstrap Platform Components
@@ -35,6 +38,8 @@ Run Ansible from WSL/Linux:
 
 ```bash
 cd /mnt/a/NoHomelessFuture/big_big_project/automation/ansible
+export AWS_ACCOUNT_ID="<aws-account-id>"
+export GIT_REPO_URL="https://github.com/<owner>/<repo>.git"
 ansible-playbook bootstrap-platform.yml
 ```
 
@@ -42,8 +47,7 @@ If IRSA for AWS Load Balancer Controller does not exist yet:
 
 ```bash
 ansible-playbook bootstrap-platform.yml \
-  -e manage_aws_lbc_irsa_with_eksctl=true \
-  -e aws_lbc_policy_arn=arn:aws:iam::<AWS_ACCOUNT_ID>:policy/AWSLoadBalancerControllerIAMPolicy
+  -e manage_aws_lbc_irsa_with_eksctl=true
 ```
 
 ## 4. Verify Argo CD

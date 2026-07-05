@@ -11,6 +11,8 @@ from starlette.responses import JSONResponse, Response
 APP_NAME = os.getenv("APP_NAME", "sample-app")
 APP_ENV = os.getenv("APP_ENV", "dev")
 APP_VERSION = os.getenv("APP_VERSION", "0.1.0")
+DOCS_URL = None if APP_ENV == "prod" else "/docs"
+OPENAPI_URL = None if APP_ENV == "prod" else "/openapi.json"
 START_TIME = time.time()
 
 REQUEST_COUNT = Counter(
@@ -63,7 +65,14 @@ async def lifespan(_: FastAPI):
 configure_logging()
 logger = logging.getLogger(APP_NAME)
 
-app = FastAPI(title=APP_NAME, version=APP_VERSION, lifespan=lifespan)
+app = FastAPI(
+    title=APP_NAME,
+    version=APP_VERSION,
+    lifespan=lifespan,
+    docs_url=DOCS_URL,
+    redoc_url=None,
+    openapi_url=OPENAPI_URL,
+)
 
 
 @app.middleware("http")
@@ -126,13 +135,13 @@ async def metrics():
 
 @app.get("/")
 async def root():
-    return JSONResponse(
-        {
-            "message": "sample-app is running",
-            "docs": "/docs",
-            "health": "/health",
-            "ready": "/ready",
-            "metrics": "/metrics",
-            "info": "/api/info",
-        }
-    )
+    payload = {
+        "message": "sample-app is running",
+        "health": "/health",
+        "ready": "/ready",
+        "metrics": "/metrics",
+        "info": "/api/info",
+    }
+    if DOCS_URL:
+        payload["docs"] = DOCS_URL
+    return JSONResponse(payload)

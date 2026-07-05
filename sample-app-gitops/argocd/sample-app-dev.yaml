@@ -6,12 +6,15 @@ metadata:
 spec:
   project: sample-app
   source:
-    repoURL: https://github.com/<GITHUB_OWNER>/eks-platform-infra.git
+    repoURL: __GIT_REPO_URL__
     targetRevision: main
     path: sample-app-gitops/helm/sample-app
     helm:
       valueFiles:
         - ../../envs/dev/values.yaml
+      parameters:
+        - name: image.repository
+          value: __ECR_REPOSITORY_URI__
   destination:
     server: https://kubernetes.default.svc
     namespace: dev

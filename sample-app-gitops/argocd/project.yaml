@@ -6,12 +6,18 @@ metadata:
 spec:
   description: Sample app project
   sourceRepos:
-    - '*'
+    - __GIT_REPO_URL__
   destinations:
     - namespace: dev
       server: https://kubernetes.default.svc
     - namespace: prod
       server: https://kubernetes.default.svc
-  clusterResourceWhitelist:
-    - group: '*'
-      kind: '*'
+  namespaceResourceWhitelist:
+    - group: apps
+      kind: Deployment
+    - group: networking.k8s.io
+      kind: Ingress
+    - group: ""
+      kind: Service
+    - group: ""
+      kind: ServiceAccount
