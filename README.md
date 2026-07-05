@@ -1,53 +1,64 @@
 # EKS GitOps Platform
 
-This repository contains a compact production-style Kubernetes platform on AWS. It demonstrates infrastructure provisioning, application delivery, GitOps, image scanning, and a basic Kubernetes security baseline.
+Repo này là một bản platform Kubernetes thu nhỏ trên AWS. Mục tiêu chính là dựng được một luồng triển khai gần với thực tế: tạo hạ tầng bằng Terraform, chạy app trên EKS, deploy bằng GitOps, build image qua CI, scan bảo mật trước khi push, và giữ các thông tin nhạy cảm ra khỏi Git.
 
-## What Is Included
+Đây không phải là một app business phức tạp. App chỉ đủ nhỏ để kiểm chứng toàn bộ pipeline hạ tầng và vận hành.
 
-- Terraform infrastructure for VPC, EKS, IAM roles, and node groups.
-- A sample FastAPI application with health, readiness, metrics, and JSON logging.
-- Docker image build and Trivy image scanning in GitHub Actions.
-- Helm chart and environment-specific values for `dev` and `prod`.
-- Argo CD Applications for GitOps deployment into EKS.
-- Ansible automation to bootstrap post-cluster platform components.
+## Có Gì Trong Repo
 
-## Repository Layout
+- Terraform để tạo VPC, EKS, IAM role và managed node group.
+- App mẫu viết bằng FastAPI, có `/health`, `/ready`, `/metrics` và log JSON.
+- Dockerfile cho app.
+- GitHub Actions để test, build image, scan bằng Trivy và push lên ECR.
+- Helm chart cho app.
+- Values riêng cho `dev` và `prod`.
+- Argo CD Application để deploy app theo GitOps.
+- Ansible playbook để bootstrap các thành phần sau khi EKS đã được tạo.
+
+## Cấu Trúc Chính
 
 ```text
-.github/workflows/ci.yml              GitHub Actions CI/CD workflow
-eks-platform-infra/                   Terraform infrastructure
-automation/ansible/                   EKS platform bootstrap playbook
-sample-app-gitops/app/                Sample FastAPI application
-sample-app-gitops/helm/sample-app/    Helm chart
-sample-app-gitops/envs/               Dev/prod Helm values
-sample-app-gitops/argocd/             Argo CD project and applications
+.github/workflows/ci.yml              CI/CD workflow
+eks-platform-infra/                   Terraform cho AWS/EKS
+automation/ansible/                   Playbook bootstrap platform
+sample-app-gitops/app/                Source app FastAPI
+sample-app-gitops/helm/sample-app/    Helm chart của app
+sample-app-gitops/envs/               Values cho dev/prod
+sample-app-gitops/argocd/             Argo CD project và applications
 ```
 
-## CI/CD Flow
+## Luồng CI/CD
 
-1. GitHub Actions tests the FastAPI app import.
-2. The workflow assumes an AWS IAM role through GitHub OIDC.
-3. Docker builds the app image.
-4. Trivy scans the image and fails on high or critical findings.
-5. The image is pushed to Amazon ECR.
-6. The dev image tag is updated in GitOps values and pushed back to `main`.
+Khi workflow chạy:
 
-GitHub Actions are pinned to full commit SHAs.
+1. GitHub Actions checkout code và test app import được.
+2. Workflow assume AWS IAM Role qua GitHub OIDC.
+3. Docker build image cho app.
+4. Trivy scan image, nếu có lỗi `HIGH` hoặc `CRITICAL` thì fail.
+5. Image được push lên Amazon ECR.
+6. Workflow cập nhật image tag cho môi trường `dev`.
+7. Argo CD sync thay đổi từ Git về EKS.
 
-## Required GitHub Secrets
+Các GitHub Actions trong workflow được pin bằng full commit SHA để tránh rủi ro tag bị thay đổi.
 
-Configure these repository secrets before running the workflow:
+## Secret Cần Có Trên GitHub
+
+Vào GitHub repo settings và tạo các repository secrets:
 
 ```text
 AWS_ACCOUNT_ID
 AWS_GITHUB_ACTIONS_ROLE_ARN
 ```
 
-`AWS_ACCOUNT_ID` is used to construct the private ECR registry URL without storing the account ID in this repository.
+`AWS_ACCOUNT_ID` dùng để dựng ECR registry URL trong workflow. Mình không commit account ID thật vào repo.
 
-## Local Bootstrap Inputs
+`AWS_GITHUB_ACTIONS_ROLE_ARN` là IAM Role cho GitHub Actions assume qua OIDC.
 
-The Ansible bootstrap renders Argo CD manifests at runtime so private repository and ECR details do not need to be committed.
+## Bootstrap Platform Bằng Ansible
+
+Sau khi Terraform đã tạo EKS cluster, chạy Ansible để cài các thành phần platform như Argo CD, ingress controller và AWS Load Balancer Controller.
+
+Trước khi chạy, export các biến cần thiết:
 
 ```bash
 export AWS_ACCOUNT_ID="<aws-account-id>"
@@ -55,38 +66,59 @@ export GIT_REPO_URL="https://github.com/<owner>/<repo>.git"
 ansible-playbook automation/ansible/bootstrap-platform.yml
 ```
 
-Optionally override the full ECR repository URI:
+Nếu muốn truyền thẳng ECR repository URI:
 
 ```bash
 export ECR_REPOSITORY_URI="<aws-account-id>.dkr.ecr.<region>.amazonaws.com/sample-app"
 ```
 
-## Security Baseline
+Ansible sẽ render manifest Argo CD ở runtime. Nhờ vậy repo không cần chứa account ID, ECR URL thật hoặc repo URL cá nhân.
 
-- No AWS account ID, IAM role ARN, access key, or token is committed intentionally.
-- Application containers run as non-root.
-- Pods disable service account token automounting.
-- Containers drop Linux capabilities and disable privilege escalation.
-- Root filesystem is configured read-only.
-- Argo CD project source and namespace permissions are scoped.
-- FastAPI docs and OpenAPI are disabled when `APP_ENV=prod`.
-- Trivy blocks images with high or critical vulnerabilities.
+## Truy Cập Argo CD
 
-## Access Model
-
-The sample app is exposed through Kubernetes Ingress. Argo CD is not published publicly by default.
-
-Use port-forwarding for temporary administrative access:
+Argo CD không được public ra internet mặc định. Cách an toàn hơn là dùng port-forward khi cần vào UI:
 
 ```bash
 kubectl port-forward svc/argocd-server -n argocd 8080:443
 ```
 
-Then open:
+Sau đó mở:
 
 ```text
 https://localhost:8080
 ```
 
-Keeping Argo CD behind port-forwarding, VPN, or a private network boundary is safer than exposing it directly to the internet.
+Port-forward chỉ tạo đường hầm tạm thời từ máy local vào service trong cluster. Nó không mở Argo CD ra public.
 
+## Bảo Mật Đang Áp Dụng
+
+- Không commit AWS account ID, access key, secret key, token hoặc IAM role ARN thật.
+- GitHub Actions dùng OIDC thay vì access key dài hạn.
+- Image được scan bằng Trivy trước khi push.
+- Container chạy non-root.
+- Tắt automount service account token cho Pod của app.
+- Drop Linux capabilities.
+- Tắt privilege escalation.
+- Root filesystem của container để read-only.
+- Argo CD Project được scope lại, không dùng wildcard rộng cho source repo và cluster resources.
+- FastAPI docs/OpenAPI bị tắt khi `APP_ENV=prod`.
+
+## Lưu Ý Khi Làm Việc Với Repo
+
+- Đừng dùng `git add .` nếu `git status` hiện nhiều file lạ do line ending.
+- Không commit file local như `HOWTO.md` hoặc `README1.md`; hai file này đã được ignore.
+- Nếu dùng chung repo giữa Windows và WSL, nên giữ line endings ổn định để tránh diff nhiễu.
+- Nếu GitHub Actions fail, đọc log của step fail trước khi sửa hàng loạt.
+
+## Mục Tiêu Của Project
+
+Project này tập trung vào cách vận hành một app nhỏ trên Kubernetes theo hướng thực tế:
+
+- hạ tầng tạo bằng code,
+- deploy bằng GitOps,
+- image đi qua CI và security scan,
+- app có health check, metrics, log,
+- cấu hình nhạy cảm không nằm trong Git,
+- các thiết lập Kubernetes cơ bản được harden.
+
+Nó đủ nhỏ để học và demo, nhưng vẫn chạm vào những phần quan trọng của một platform cloud-native thật.
