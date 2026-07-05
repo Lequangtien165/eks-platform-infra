@@ -5,13 +5,13 @@
 
   tasks:
     - name: Verify required CLIs are available
-      ansible.builtin.command: "{{ item }} --version"
+      ansible.builtin.command: "{{ item }}"
       changed_when: false
       loop:
-        - aws
-        - kubectl
-        - helm
-        - terraform
+        - aws --version
+        - kubectl version --client
+        - helm version
+        - terraform --version
 
     - name: Verify eksctl is available when IRSA bootstrap is enabled
       ansible.builtin.command: eksctl version
@@ -78,6 +78,8 @@
         argv:
           - kubectl
           - apply
+          - --server-side=true
+          - --force-conflicts
           - -n
           - "{{ argocd_namespace }}"
           - -f
