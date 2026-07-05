@@ -90,18 +90,6 @@ https://localhost:8080
 
 Port-forward chỉ tạo đường hầm tạm thời từ máy local vào service trong cluster. Nó không mở Argo CD ra public.
 
-## Bảo Mật Đang Áp Dụng
-
-- Không commit AWS account ID, access key, secret key, token hoặc IAM role ARN thật.
-- GitHub Actions dùng OIDC thay vì access key dài hạn.
-- Image được scan bằng Trivy trước khi push.
-- Container chạy non-root.
-- Tắt automount service account token cho Pod của app.
-- Drop Linux capabilities.
-- Tắt privilege escalation.
-- Root filesystem của container để read-only.
-- Argo CD Project được scope lại, không dùng wildcard rộng cho source repo và cluster resources.
-- FastAPI docs/OpenAPI bị tắt khi `APP_ENV=prod`.
 
 ## Lưu Ý Khi Làm Việc Với Repo
 
@@ -109,16 +97,3 @@ Port-forward chỉ tạo đường hầm tạm thời từ máy local vào servi
 - Không commit file local như `HOWTO.md` hoặc `README1.md`; hai file này đã được ignore.
 - Nếu dùng chung repo giữa Windows và WSL, nên giữ line endings ổn định để tránh diff nhiễu.
 - Nếu GitHub Actions fail, đọc log của step fail trước khi sửa hàng loạt.
-
-## Mục Tiêu Của Project
-
-Project này tập trung vào cách vận hành một app nhỏ trên Kubernetes theo hướng thực tế:
-
-- hạ tầng tạo bằng code,
-- deploy bằng GitOps,
-- image đi qua CI và security scan,
-- app có health check, metrics, log,
-- cấu hình nhạy cảm không nằm trong Git,
-- các thiết lập Kubernetes cơ bản được harden.
-
-Nó đủ nhỏ để học và demo, nhưng vẫn chạm vào những phần quan trọng của một platform cloud-native thật.
