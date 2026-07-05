@@ -2,7 +2,7 @@ replicaCount: 2
 
 image:
   repository: <AWS_ACCOUNT_ID>.dkr.ecr.ap-southeast-1.amazonaws.com/sample-app
-  tag: "7bda753ab3e8"
+  tag: "e14ff43a04d4"
   pullPolicy: IfNotPresent
 
 env:
