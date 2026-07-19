@@ -1,99 +1,120 @@
 # EKS GitOps Platform
 
-Repo này là một bản platform Kubernetes thu nhỏ trên AWS. Mục tiêu chính là dựng được một luồng triển khai gần với thực tế: tạo hạ tầng bằng Terraform, chạy app trên EKS, deploy bằng GitOps, build image qua CI, scan bảo mật trước khi push, và giữ các thông tin nhạy cảm ra khỏi Git.
+This repository presents a production-style AWS EKS platform for deploying a sample application with Terraform, Docker, Kubernetes, GitOps, CI/CD automation, and security scanning. It is designed as a portfolio-ready project that demonstrates modern cloud-native engineering practices in a practical, end-to-end workflow.
 
-Đây không phải là một app business phức tạp. App chỉ đủ nhỏ để kiểm chứng toàn bộ pipeline hạ tầng và vận hành.
+## Architecture Overview
 
-## Có Gì Trong Repo
+![EKS GitOps Platform Architecture](eks_gitops_platform.png)
 
-- Terraform để tạo VPC, EKS, IAM role và managed node group.
-- App mẫu viết bằng FastAPI, có `/health`, `/ready`, `/metrics` và log JSON.
-- Dockerfile cho app.
-- GitHub Actions để test, build image, scan bằng Trivy và push lên ECR.
-- Helm chart cho app.
-- Values riêng cho `dev` và `prod`.
-- Argo CD Application để deploy app theo GitOps.
-- Ansible playbook để bootstrap các thành phần sau khi EKS đã được tạo.
+## Why This Project Matters
 
-## Cấu Trúc Chính
+This project is built to showcase a realistic platform engineering workflow that covers the full delivery lifecycle:
+
+- Infrastructure provisioning on AWS with Terraform
+- Kubernetes cluster deployment on Amazon EKS
+- Application containerization with Docker
+- Automated CI/CD pipelines with GitHub Actions
+- Image scanning and security validation with Trivy
+- GitOps-based deployment with Argo CD and Helm
+- Environment separation for development and production
+
+## Key Technologies
+
+- Terraform for infrastructure as code
+- Amazon EKS for container orchestration
+- Docker for application packaging
+- Helm for Kubernetes deployment templating
+- Argo CD for GitOps-based synchronization
+- GitHub Actions for automation
+- Ansible for platform bootstrap
+- Trivy for container image security scanning
+
+## What the Repository Contains
+
+- Terraform modules and environment configuration for AWS networking and EKS in [eks-platform-infra](eks-platform-infra)
+- Ansible automation for platform bootstrap in [automation/ansible](automation/ansible)
+- A sample FastAPI application in [sample-app-gitops/app](sample-app-gitops/app)
+- Helm charts and environment-specific values in [sample-app-gitops/helm](sample-app-gitops/helm) and [sample-app-gitops/envs](sample-app-gitops/envs)
+- Argo CD manifests in [sample-app-gitops/argocd](sample-app-gitops/argocd)
+
+## Repository Structure
 
 ```text
 .github/workflows/ci.yml              CI/CD workflow
-eks-platform-infra/                   Terraform cho AWS/EKS
-automation/ansible/                   Playbook bootstrap platform
-sample-app-gitops/app/                Source app FastAPI
-sample-app-gitops/helm/sample-app/    Helm chart của app
-sample-app-gitops/envs/               Values cho dev/prod
-sample-app-gitops/argocd/             Argo CD project và applications
+eks-platform-infra/                   Terraform for AWS and EKS
+automation/ansible/                   Bootstrap automation for platform services
+sample-app-gitops/app/                Sample FastAPI application source
+sample-app-gitops/helm/sample-app/    Helm chart for the application
+sample-app-gitops/envs/               Environment values for dev and prod
+sample-app-gitops/argocd/             Argo CD project and applications
 ```
 
-## Luồng CI/CD
+## CI/CD Workflow
 
-Khi workflow chạy:
+When the workflow runs, it performs the following steps:
 
-1. GitHub Actions checkout code và test app import được.
-2. Workflow assume AWS IAM Role qua GitHub OIDC.
-3. Docker build image cho app.
-4. Trivy scan image, nếu có lỗi `HIGH` hoặc `CRITICAL` thì fail.
-5. Image được push lên Amazon ECR.
-6. Workflow cập nhật image tag cho môi trường `dev`.
-7. Argo CD sync thay đổi từ Git về EKS.
+1. Checks out the source code and validates the application.
+2. Assumes an AWS IAM role through GitHub OIDC.
+3. Builds the container image for the sample application.
+4. Scans the image with Trivy and fails on HIGH or CRITICAL issues.
+5. Pushes the image to Amazon ECR.
+6. Updates the deployment image tag for the target environment.
+7. Allows Argo CD to synchronize the updated state into the EKS cluster.
 
-Các GitHub Actions trong workflow được pin bằng full commit SHA để tránh rủi ro tag bị thay đổi.
+## Required GitHub Secrets
 
-## Secret Cần Có Trên GitHub
-
-Vào GitHub repo settings và tạo các repository secrets:
+Create the following repository secrets in GitHub:
 
 ```text
 AWS_ACCOUNT_ID
 AWS_GITHUB_ACTIONS_ROLE_ARN
 ```
 
-`AWS_ACCOUNT_ID` dùng để dựng ECR registry URL trong workflow. Mình không commit account ID thật vào repo.
+- `AWS_ACCOUNT_ID` is used to construct the ECR registry URL in the workflow.
+- `AWS_GITHUB_ACTIONS_ROLE_ARN` is the IAM role that GitHub Actions assumes through OIDC.
 
-`AWS_GITHUB_ACTIONS_ROLE_ARN` là IAM Role cho GitHub Actions assume qua OIDC.
+## Portfolio-Ready Highlights
 
-## Bootstrap Platform Bằng Ansible
+This project demonstrates practical experience in:
 
-Sau khi Terraform đã tạo EKS cluster, chạy Ansible để cài các thành phần platform như Argo CD, ingress controller và AWS Load Balancer Controller.
+- Infrastructure as Code and reusable Terraform modules
+- Kubernetes platform operations on EKS
+- GitOps deployment strategies with Argo CD
+- Secure CI/CD automation and image assurance
+- Environment-based configuration for multi-stage delivery
 
-Trước khi chạy, export các biến cần thiết:
+## Documentation
 
-```bash
-export AWS_ACCOUNT_ID="<aws-account-id>"
-export GIT_REPO_URL="https://github.com/<owner>/<repo>.git"
-ansible-playbook automation/ansible/bootstrap-platform.yml
-```
+For a full end-to-end setup guide, please refer to [HOWTO.md](HOWTO.md).
 
-Nếu muốn truyền thẳng ECR repository URI:
+To regenerate the architecture diagram locally, use [architecture.py](architecture.py).
 
-```bash
-export ECR_REPOSITORY_URI="<aws-account-id>.dkr.ecr.<region>.amazonaws.com/sample-app"
-```
+## Notes
 
-Ansible sẽ render manifest Argo CD ở runtime. Nhờ vậy repo không cần chứa account ID, ECR URL thật hoặc repo URL cá nhân.
+- Avoid broad staging commands such as `git add .` when reviewing unfamiliar changes.
+- Keep secrets out of version control.
+- Maintain consistent line endings when working across Windows and Linux environments.
+- When CI fails, inspect the failing step logs before making broad changes.
 
-## Truy Cập Argo CD
+## Accessing Argo CD
 
-Argo CD không được public ra internet mặc định. Cách an toàn hơn là dùng port-forward khi cần vào UI:
+Argo CD is not exposed publicly by default. A secure approach for local access is to use port forwarding:
 
 ```bash
 kubectl port-forward svc/argocd-server -n argocd 8080:443
 ```
 
-Sau đó mở:
+Then open:
 
 ```text
 https://localhost:8080
 ```
 
-Port-forward chỉ tạo đường hầm tạm thời từ máy local vào service trong cluster. Nó không mở Argo CD ra public.
+This provides a temporary secure tunnel from your local machine to the cluster without making Argo CD publicly reachable.
 
+## Notes
 
-## Lưu Ý Khi Làm Việc Với Repo
-
-- Đừng dùng `git add .` nếu `git status` hiện nhiều file lạ do line ending.
-- Không commit file local như `HOWTO.md` hoặc `README1.md`; hai file này đã được ignore.
-- Nếu dùng chung repo giữa Windows và WSL, nên giữ line endings ổn định để tránh diff nhiễu.
-- Nếu GitHub Actions fail, đọc log của step fail trước khi sửa hàng loạt.
+- Avoid broad staging commands such as `git add .` when reviewing unfamiliar changes.
+- Keep secrets out of version control.
+- Maintain consistent line endings when working across Windows and Linux environments.
+- When CI fails, inspect the failing step logs before making broad changes.
